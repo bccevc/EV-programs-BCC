@@ -223,10 +223,5 @@ These can be modified on the BMS software.
 
 ***
 
-# From the Summer 2024 Team: Need Help?
 
-Maybe we remember or forgot something. We'll do our best to help. :)
 
-- Alex: gutierrezale101@gmail.com
-- Fuzail: alifuzail5@gmail.com
-- Rebekah: rbkehan@gmail.com
