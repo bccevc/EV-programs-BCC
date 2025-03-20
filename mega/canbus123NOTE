@@ -1,0 +1,88 @@
+🚀 Key Features in This Code
+
+CAN Bus Reading & Decoding
+Reads data from the CAN Bus (Controller Area Network).
+Extracts current, voltage, power, and battery parameters.
+Logs CAN messages into LCD and SD card.
+GPS Tracking & Distance Calculation
+Reads latitude and longitude from the GPS module.
+Calculates trip distance using Haversine formula.
+Displays live GPS speed, trip distance, and energy usage.
+Data Logging to SD Card
+Stores timestamped CAN bus messages.
+Logs GPS data, voltage, current, and power usage.
+Calculates MPGe (Miles per Gallon Equivalent).
+Live LCD Display Updates
+Shows vehicle speed, trip distance, power usage, and battery temperature.
+Displays real-time GPS coordinates.
+Updates parameters like RPM, motor controller temp, and battery voltage.
+
+📌 Key Code Sections & Their Purpose
+
+1️⃣ CAN Bus Communication
+if (mcp2515_check_message()) {
+    if (mcp2515_get_message(&message)) {    
+        Serial.print("ID: ");
+        Serial.print(message.id,HEX);
+Listens for CAN messages from the vehicle.
+Filters messages based on ID (e.g., 0x03B for current, 0x123 for battery temp).
+2️⃣ GPS Communication & Distance Calculation
+while (Serial3.available()) {
+    int c = Serial3.read();
+    if (gps.encode(c)) {
+        getgps(gps);
+Reads live latitude & longitude from GPS.
+Uses Haversine Formula to compute distance traveled.
+float calcDist(float CurrentLatitude, float CurrentLongitude, float SavedLatitude, float SavedLongitude) {
+    const double EarthRadius = 3961;  // Miles
+    float DeltaLatitude, DeltaLongitude, a, Distance;
+    a = (sin(DeltaLatitude/2) * sin(DeltaLatitude/2)) + cos(CurrentLatitude) * cos(SavedLatitude) * (sin(DeltaLongitude/2) * sin(DeltaLongitude/2));
+    Distance = EarthRadius * (2 * atan2(sqrt(a),sqrt(1-a)));
+    return(Distance);
+}
+Calculates trip distance from GPS coordinates.
+3️⃣ SD Card Logging
+File dataFile = SD.open("datalog.txt", FILE_WRITE);
+if (dataFile) {  
+    dataFile.print(timeStamp);
+    dataFile.print(",");
+    dataFile.print(latitude,5);
+    dataFile.print(",");
+    dataFile.print(longitude,5);
+    dataFile.close();
+}
+Saves GPS & CAN data into an SD card (datalog.txt).
+Helps with post-analysis & debugging.
+4️⃣ Real-Time LCD Display
+lcd.setCursor(0,0);
+lcd.print(gps.f_speed_mph());
+lcd.print("MPH ");
+lcd.setCursor(10,3);
+lcd.print("TRIP:");
+lcd.print(TotalDist,2);
+Updates LCD live with:
+Vehicle Speed (MPH)
+Trip Distance
+Battery Health
+Energy Consumption
+🔍 Next Steps for You
+
+Test this Code on Your Bench Setup
+Does LCD display correct live data?
+Are GPS & CAN messages working?
+Is data saved correctly on SD card?
+Debug Issues One by One
+If GPS data isn’t updating → Check wiring & Serial3.begin(GPSBAUD);
+If CAN data isn’t updating → Verify mcp2515_get_message(&message)
+Visualize Data in Excel
+Extract datalog.txt
+Analyze Energy, Distance, and MPGe
+🚀 Summary
+This new code is a complete vehicle telemetry system, combining:
+
+CAN Bus Monitoring
+GPS Tracking
+Energy Efficiency Analysis
+Real-time LCD Updates
+SD Card Data Logging
+This makes it a powerful system for analyzing EV performance!
