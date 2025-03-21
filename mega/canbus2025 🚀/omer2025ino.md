@@ -133,16 +133,22 @@ GPS must be locked before starting (ensures time/date accuracy).
 📝 Sample Output: log_03252025_1410.txt
 
 Human-readable log (every 1 second)
+
+
 [Time: 14:10:03] [Date: 3/25/2025] Speed: 34.28 mph, Lat: 40.900123, Lon: -74.213400, V: 322.5 V, I: 45.2 A, SoC: 78.3% , MPGe: 179.42
 [Time: 14:10:04] [Date: 3/25/2025] Speed: 34.89 mph, Lat: 40.900145, Lon: -74.213410, V: 322.8 V, I: 44.8 A, SoC: 78.0% , MPGe: 178.90
 [Time: 14:10:05] [Date: 3/25/2025] Speed: 35.25 mph, Lat: 40.900168, Lon: -74.213425, V: 323.1 V, I: 45.0 A, SoC: 77.7% , MPGe: 178.43
 📈 Sample Output: log_03252025_1410.csv
 
 Comma-separated values for Excel, Python, MATLAB, etc.
+
+
 GPS Date,GPS Time,Timestamp(ms),Discharge Enable,Charger Safe,GPS Speed (mph),Latitude,Longitude,MC Temp (°C),Pack Voltage (V),Pack Current (A),State of Charge (%),Lowest Cell V (V),Lowest Cell ID,Highest Cell V (V),Highest Cell ID,Balancing Active,Highest Therm Temp (°C),Thermistor ID,Error Flags,Time Increment (s),Distance Increment (mi),Energy Increment (kWh),Cumulative Distance (mi),Cumulative Energy (kWh),kWh per Mile,MPGe
 3/25/2025,14:10:03,120000,1,1,34.28,40.900123,-74.213400,38.1,322.5,45.2,78.3,3.621,6,4.195,12,0,41.2,3,0,1,0.0023,0.00015,1.2310,0.2312,0.1878,179.42
 3/25/2025,14:10:04,121000,1,1,34.89,40.900145,-74.213410,38.3,322.8,44.8,78.0,3.622,6,4.194,12,0,41.1,3,0,1,0.0024,0.00014,1.2334,0.2313,0.1875,179.28
 3/25/2025,14:10:05,122000,1,1,35.25,40.900168,-74.213425,38.5,323.1,45.0,77.7,3.623,6,4.193,12,0,41.0,3,0,1,0.0025,0.00015,1.2359,0.2315,0.1873,179.15
+
+
 📺 Sample LCD Display (20x4 Characters)
 
 Rotating or fixed fields shown while driving
