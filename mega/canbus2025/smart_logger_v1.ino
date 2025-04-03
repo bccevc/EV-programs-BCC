@@ -4,24 +4,23 @@
 // ** Logs vehicle data to SD card (.txt + .csv files) **
 // ******************************************************
 
-// Include necessary libraries for CAN, SD card, GPS, LCD, etc.
-#include <Canbus.h>              // Handles CAN communication
-#include <mcp2515.h>             // Interfaces with MCP2515 CAN controller
-#include <SPI.h>                 // SPI protocol for CAN and SD
-#include <SD.h>                  // File handling for SD card
-#include <Wire.h>                // I2C communication (used by LCD)
-#include <TinyGPS.h>             // Processes NMEA sentences from GPS
-#include <SoftwareSerial.h>      // Creates virtual serial port for GPS
-#include <SerLCD.h>              // Controls the serial LCD display
-#include <math.h>                // Math operations (e.g., sqrt, sin)
+#include <Canbus.h>
+#include <mcp2515.h>
+#include <SPI.h>
+#include <SD.h>
+#include <Wire.h>
+#include <TinyGPS.h>
+#include <SoftwareSerial.h>
+#include <SerLCD.h>
+#include <math.h>
 
-// Define pins and constants
-#define RXPIN 4                   // GPS receive pin
-#define TXPIN 5                   // GPS transmit pin
-#define GPSBAUD 4800              // GPS communication speed
-#define SD_CS 10                  // SD card chip select pin
+// -------- Pin Definitions --------
+#define RXPIN 4
+#define TXPIN 5
+#define GPSBAUD 4800
+#define SD_CS 10
 
-// Define CAN message IDs for extracting specific vehicle data
+// -------- CAN Message IDs --------
 #define CAN_ID_VOLTAGE_CURRENT 0x03B
 #define CAN_ID_SOC 0x1A0
 #define CAN_ID_MIN_CELL_V 0x1B0
@@ -35,21 +34,25 @@
 #define CAN_ID_HIGH_CELL_ID 0x1E1
 #define CAN_ID_THERMISTOR_ID 0x1E2
 
-// Initialize serial devices and objects
-SoftwareSerial uart_gps(RXPIN, TXPIN); // Virtual serial for GPS
-TinyGPS gps;                           // GPS parser
-SerLCD lcd;                            // LCD screen handler
-File logTxt;                           // File handler for .txt log
-File logCsv;                           // File handler for .csv log
+// -------- Objects & Variables --------
+SoftwareSerial uart_gps(RXPIN, TXPIN);
+TinyGPS gps;
+SerLCD lcd;
+File logTxt;
+File logCsv;
 
-// Initialize GPS and vehicle tracking variables
-float latitude, longitude, lastLat = 0, lastLon = 0; // GPS coordinates
-float totalDist = 0.0, energyUsed = 0.0;             // Accumulated values
-unsigned long startTime;                             // For timestamping logs
-String csvName = "";                                 // Dynamic filename for CSV
-String txtName = "";                                 // Dynamic filename for TXT
+float latitude, longitude, lastLat = 0, lastLon = 0;
+float totalDist = 0.0, energyUsed = 0.0;
+unsigned long startTime;
+String csvName = "";
+String txtName = "";
 
-// Function to generate filename based on current GPS date/time
+// -------- Function Declarations --------
+float readCANValue(int canID, int byteIndex = 0);
+float readCAN16BitValue(int canID, int startIndex = 0, float scale = 10.0);
+float calcDist(float lat1, float lon1, float lat2, float lon2);
+
+// -------- Generate Filename from GPS Timestamp --------
 String generateFileName(String prefix, String ext) {
   int year; byte month, day, hour, minute, second, hundredths;
   gps.crack_datetime(&year, &month, &day, &hour, &minute, &second, &hundredths);
@@ -58,48 +61,51 @@ String generateFileName(String prefix, String ext) {
   return String(filename);
 }
 
+// -------- Setup --------
 void setup() {
-  Serial.begin(115200);               // For debugging
-  uart_gps.begin(GPSBAUD);           // Start GPS serial
-  Wire.begin();                      // Start I2C for LCD
-  lcd.begin(Wire);                   // Begin LCD
+  Serial.begin(115200);
+  uart_gps.begin(GPSBAUD);
+  Wire.begin();
+  lcd.begin(Wire);
   lcd.clear();
 
-  if (!SD.begin(SD_CS)) {            // Initialize SD card
+  if (!SD.begin(SD_CS)) {
     Serial.println("SD card init failed");
     return;
   }
 
-  // Wait until GPS date/time is valid for filename creation
-  while (!gps.crack_datetime(nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr)) {
-    if (uart_gps.available()) gps.encode(uart_gps.read());
+  // Wait for valid GPS timestamp
+  int year = 0; byte month, day, hour, minute, second, hundredths;
+  while (year == 0) {
+    while (uart_gps.available()) {
+      gps.encode(uart_gps.read());
+    }
+    gps.crack_datetime(&year, &month, &day, &hour, &minute, &second, &hundredths);
   }
 
-  startTime = millis();              // Mark starting time
+  startTime = millis();
   csvName = generateFileName("log", "csv");
   txtName = generateFileName("log", "txt");
 
   logCsv = SD.open(csvName, FILE_WRITE);
-  logTxt = SD.open(txtName, FILE_WRITE);
-
-  // Write headers to CSV file
   if (logCsv) {
     logCsv.println("GPS Date,GPS Time,Timestamp(ms),Discharge Enable,Charger Safe,GPS Speed (mph),Latitude,Longitude,MC Temp (°C),Pack Voltage (V),Pack Current (A),State of Charge (%),Lowest Cell V (V),Lowest Cell ID,Highest Cell V (V),Highest Cell ID,Balancing Active,Highest Therm Temp (°C),Thermistor ID,Error Flags,Time Increment (s),Distance Increment (mi),Energy Increment (kWh),Cumulative Distance (mi),Cumulative Energy (kWh),kWh per Mile,MPGe");
     logCsv.close();
   }
 }
 
+// -------- Loop --------
 void loop() {
-  unsigned long now = millis();       // Current timestamp
-  float speed = gps.f_speed_mph();    // GPS speed
+  unsigned long now = millis();
+  float speed = gps.f_speed_mph();
 
   if (uart_gps.available()) {
-    char c = uart_gps.read();         // Read GPS byte
-    gps.encode(c);                    // Decode GPS sentence
-    gps.f_get_position(&latitude, &longitude); // Get coordinates
+    char c = uart_gps.read();
+    gps.encode(c);
+    gps.f_get_position(&latitude, &longitude);
   }
 
-  // Read values from CAN bus
+  // Read CAN data
   float current = readCAN16BitValue(CAN_ID_VOLTAGE_CURRENT, 0, 10.0);
   float voltage = readCANValue(CAN_ID_VOLTAGE_CURRENT, 3);
   float soc = readCANValue(CAN_ID_SOC);
@@ -115,16 +121,16 @@ void loop() {
   float thermID = readCANValue(CAN_ID_THERMISTOR_ID);
   float thermTemp = mcTemp;
 
-  float distInc = calcDist(latitude, longitude, lastLat, lastLon); // Haversine calc
+  float distInc = calcDist(latitude, longitude, lastLat, lastLon);
   lastLat = latitude;
   lastLon = longitude;
   totalDist += distInc;
 
-  float energyInc = (voltage * current / 1000.0) * (1.0 / 3600.0); // Energy in kWh for 1s
+  float energyInc = (voltage * current / 1000.0) * (1.0 / 3600.0);
   energyUsed += energyInc;
 
-  float kWhPerMile = (totalDist > 0) ? energyUsed / totalDist : 0; // Efficiency
-  float mpge = (energyUsed > 0) ? (totalDist / energyUsed) * 33.7 : 0; // EPA conversion
+  float kWhPerMile = (totalDist > 0) ? energyUsed / totalDist : 0;
+  float mpge = (energyUsed > 0) ? (totalDist / energyUsed) * 33.7 : 0;
 
   int year; byte month, day, hour, minute, second, hundredths;
   gps.crack_datetime(&year, &month, &day, &hour, &minute, &second, &hundredths);
@@ -178,11 +184,12 @@ void loop() {
     logTxt.println();
     logTxt.close();
   }
-  delay(1000); // Log once per second
+
+  delay(1000); // log every second
 }
 
-// Read a single byte from a CAN message
-float readCANValue(int canID, int byteIndex = 0) {
+// -------- Helper Functions --------
+float readCANValue(int canID, int byteIndex) {
   tCAN message;
   if (mcp2515_check_message() && mcp2515_get_message(&message)) {
     if (message.id == canID) return message.data[byteIndex];
@@ -190,8 +197,7 @@ float readCANValue(int canID, int byteIndex = 0) {
   return 0.0;
 }
 
-// Read two bytes and convert to a scaled float value (e.g., voltage, current)
-float readCAN16BitValue(int canID, int startIndex = 0, float scale = 10.0) {
+float readCAN16BitValue(int canID, int startIndex, float scale) {
   tCAN message;
   if (mcp2515_check_message() && mcp2515_get_message(&message)) {
     if (message.id == canID) {
@@ -202,14 +208,12 @@ float readCAN16BitValue(int canID, int startIndex = 0, float scale = 10.0) {
   return 0.0;
 }
 
-// Haversine distance calculation (miles)
 float calcDist(float lat1, float lon1, float lat2, float lon2) {
   if (lat2 == 0 && lon2 == 0) return 0.0;
-  const float R = 3958.8; // Earth radius in miles
+  const float R = 3958.8;
   float dLat = radians(lat1 - lat2);
   float dLon = radians(lon1 - lon2);
   float a = sin(dLat / 2) * sin(dLat / 2) + cos(radians(lat2)) * cos(radians(lat1)) * sin(dLon / 2) * sin(dLon / 2);
   float c = 2 * atan2(sqrt(a), sqrt(1 - a));
   return R * c;
 }
-
